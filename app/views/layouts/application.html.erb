@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title><%= content_for?(:title) ? yield(:title) : "Music App" %></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="application-name" content="Music App">
+    <meta name="theme-color" content="#0b0b0f">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Music App">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+
+    <%= yield :head %>
+
+    <%= tag.link rel: "manifest", href: pwa_manifest_path(format: :json) %>
+
+    <link rel="icon" href="/icon.png" type="image/png">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icon.png">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;600&display=swap" rel="stylesheet">
+
+    <%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
+  </head>
+
+  <body>
+    <%# SoftNav only replaces #page-content. Global player stays alive (Rails 4: same idea with Turbolinks permanent / PJAX). %>
+    <div id="page-content">
+      <%= yield %>
+    </div>
+
+    <%= render "shared/global_player" %>
+
+    <%# Classic script (not type=module) so SoftNav boots reliably — Rails 4 Sprockets-compatible. %>
+    <script src="<%= asset_path('application.js') %>" defer></script>
+  </body>
+</html>
