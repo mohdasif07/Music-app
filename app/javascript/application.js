@@ -167,6 +167,7 @@
 
     isAppRoute: function (route) {
       if (route === "/" || route === "") return true
+      if (route === "/player") return true
       if (/^\/albums\/[^\/]+$/.test(route)) return true
       if (/^\/playlists\/[^\/]+$/.test(route)) return true
       return false
@@ -208,17 +209,86 @@
 
       if (albumMatch) {
         mount.innerHTML = Pages.albumShell(albumMatch[1])
-        document.title = "Album — Music App"
+        document.title = "Album — Advanced Audio Player"
       } else if (playlistMatch) {
         mount.innerHTML = Pages.playlistShell(playlistMatch[1])
-        document.title = "Playlist — Music App"
+        document.title = "Playlist — Advanced Audio Player"
+      } else if (route === "/player") {
+        AdvancedPlayer.open()
+        mount.innerHTML = Pages.catalogShell()
+        document.title = "Now Playing — Advanced Audio Player"
       } else {
         mount.innerHTML = Pages.catalogShell()
-        document.title = "Music App — Library"
+        document.title = "Advanced Audio Player Demo"
       }
 
       Pages.renderActive()
       document.documentElement.dataset.route = route
+    }
+  }
+
+  // --- Advanced Audio Player panel (full UI) ---
+  var AdvancedPlayer = {
+    open: function () {
+      var panel = document.getElementById("advanced-player")
+      if (!panel) return
+      panel.hidden = false
+      panel.removeAttribute("hidden")
+      panel.style.display = "flex"
+      document.body.classList.add("aap-open")
+      AdvancedPlayer.syncBadge()
+    },
+
+    close: function () {
+      var panel = document.getElementById("advanced-player")
+      if (!panel) return
+      panel.hidden = true
+      panel.setAttribute("hidden", "")
+      panel.style.display = "none"
+      document.body.classList.remove("aap-open")
+      if (SoftNav.currentRoute() === "/player") {
+        history.replaceState({ musicGuard: true }, "", "/#/")
+      }
+    },
+
+    isOpen: function () {
+      var panel = document.getElementById("advanced-player")
+      return !!(panel && !panel.hidden)
+    },
+
+    syncBadge: function () {
+      var badge = document.getElementById("mediasession-badge")
+      if (!badge) return
+      if ("mediaSession" in navigator) {
+        badge.textContent = "Media Session active · Background ready"
+        badge.classList.add("is-on")
+      } else {
+        badge.textContent = "Media Session not supported in this browser"
+        badge.classList.remove("is-on")
+      }
+    },
+
+    init: function () {
+      var openBtn = document.getElementById("global-player")
+      var closeBtn = document.getElementById("aap-close")
+      if (openBtn) {
+        openBtn.addEventListener("click", function () {
+          AdvancedPlayer.open()
+        })
+      }
+      if (closeBtn) {
+        closeBtn.addEventListener("click", function () {
+          AdvancedPlayer.close()
+        })
+      }
+      document.addEventListener("click", function (event) {
+        var demoBtn = event.target.closest && event.target.closest("#open-aap-demo")
+        if (demoBtn) {
+          event.preventDefault()
+          AdvancedPlayer.open()
+        }
+      })
+      AdvancedPlayer.syncBadge()
     }
   }
 
@@ -265,27 +335,31 @@
     },
 
     onPopState: function () {
+      // Close full player first
+      if (AdvancedPlayer.isOpen()) {
+        AdvancedPlayer.close()
+        AndroidBackGuard.seed()
+        return
+      }
+
       var playing = AndroidBackGuard.isPlaying()
       var route = SoftNav.currentRoute()
-      var atHome = route === "/" || route === ""
+      var atHome = route === "/" || route === "" || route === "/player"
 
-      // Album/playlist pe Back → Library (music continue)
       if (!atHome) {
         AndroidBackGuard.goHomeKeepAudio()
         if (playing) {
-          AndroidBackGuard.toast("Library — music chal rahi hai. Bahar: ○ Home")
+          AndroidBackGuard.toast("Library — music still playing. Leave with ○ Home")
         }
         return
       }
 
-      // Library + music playing → app band mat hone do
       if (playing) {
         AndroidBackGuard.seed()
-        AndroidBackGuard.toast("Music chal rahi hai — bahar jane ke liye ○ Home dabao")
+        AndroidBackGuard.toast("Music playing — use ○ Home to leave (keeps background audio)")
         return
       }
 
-      // Library + paused → double Back se exit
       if (AndroidBackGuard.exitArmed) {
         AndroidBackGuard.exitArmed = false
         history.back()
@@ -294,7 +368,7 @@
 
       AndroidBackGuard.exitArmed = true
       AndroidBackGuard.seed()
-      AndroidBackGuard.toast("Exit: phir se Back dabao")
+      AndroidBackGuard.toast("Exit: press Back again")
       setTimeout(function () {
         AndroidBackGuard.exitArmed = false
       }, 2000)
@@ -306,7 +380,6 @@
       AndroidBackGuard.seed()
       window.addEventListener("popstate", AndroidBackGuard.onPopState)
 
-      // Jab play start ho, guard dubara seed karo taaki Back hamesha catch ho.
       document.addEventListener("play", function (event) {
         if (event.target && event.target.id === "audio") AndroidBackGuard.seed()
       }, true)
@@ -327,7 +400,7 @@
 
     init: function () {
       if (this.ready) return
-      var root = document.getElementById("global-player")
+      var root = document.getElementById("advanced-player")
       var audio = document.getElementById("audio")
       if (!root || !audio) return
 
@@ -337,12 +410,17 @@
         title: document.getElementById("track-title"),
         artist: document.getElementById("track-artist"),
         art: document.getElementById("track-art"),
+        miniTitle: document.getElementById("mini-title"),
+        miniArtist: document.getElementById("mini-artist"),
+        miniArt: document.getElementById("mini-art"),
         seek: document.getElementById("seek"),
         currentTime: document.getElementById("current-time"),
         duration: document.getElementById("duration"),
         play: document.getElementById("btn-play"),
         prev: document.getElementById("btn-prev"),
         next: document.getElementById("btn-next"),
+        seekBack: document.getElementById("btn-seek-back"),
+        seekFwd: document.getElementById("btn-seek-fwd"),
         shuffle: document.getElementById("btn-shuffle"),
         repeat: document.getElementById("btn-repeat"),
         mute: document.getElementById("btn-mute"),
@@ -357,7 +435,7 @@
       this.setSpeed(1)
       this.updateRepeatUi()
       this.ready = true
-      root.classList.add("is-ready")
+      this.root.classList.add("is-ready")
 
       // Resume after hard refresh / failed SoftNav fallback.
       this.restoreState()
@@ -443,6 +521,12 @@
       els.play.addEventListener("click", function () { self.togglePlay() })
       els.next.addEventListener("click", function () { self.next() })
       els.prev.addEventListener("click", function () { self.prev() })
+      if (els.seekBack) {
+        els.seekBack.addEventListener("click", function () { self.skipBy(-15) })
+      }
+      if (els.seekFwd) {
+        els.seekFwd.addEventListener("click", function () { self.skipBy(15) })
+      }
 
       els.shuffle.addEventListener("click", function () {
         self.shuffle = !self.shuffle
@@ -552,12 +636,26 @@
 
     updatePlayUi: function (playing) {
       this.root.classList.toggle("is-playing", playing)
+      document.getElementById("global-player").classList.toggle("is-playing", playing)
       this.els.play.setAttribute("aria-pressed", playing ? "true" : "false")
       this.els.play.setAttribute("aria-label", playing ? "Pause" : "Play")
       if ("mediaSession" in navigator) {
         navigator.mediaSession.playbackState = playing ? "playing" : "paused"
       }
       this.renderPageLists()
+    },
+
+    syncMini: function (track) {
+      if (!track) return
+      if (this.els.miniTitle) this.els.miniTitle.textContent = track.title
+      if (this.els.miniArtist) this.els.miniArtist.textContent = track.artist
+      if (this.els.miniArt) this.els.miniArt.src = track.art
+    },
+
+    skipBy: function (seconds) {
+      if (!isFinite(this.audio.duration)) return
+      this.audio.currentTime = Math.max(0, Math.min(this.audio.duration, this.audio.currentTime + seconds))
+      this.syncProgress()
     },
 
     updateRepeatUi: function () {
@@ -589,18 +687,36 @@
       navigator.mediaSession.metadata = new MediaMetadata({
         title: track.title,
         artist: track.artist,
-        album: "Music App",
-        artwork: [{ src: "/icon.png", sizes: "512x512", type: "image/png" }]
+        album: "Advanced Audio Player",
+        artwork: [
+          { src: "/icon.png", sizes: "512x512", type: "image/png" },
+          { src: track.art, sizes: "512x512", type: "image/svg+xml" }
+        ]
       })
 
-      navigator.mediaSession.setActionHandler("play", function () { self.play() })
-      navigator.mediaSession.setActionHandler("pause", function () { self.pause() })
-      navigator.mediaSession.setActionHandler("previoustrack", function () { self.prev() })
-      navigator.mediaSession.setActionHandler("nexttrack", function () { self.next() })
-      navigator.mediaSession.setActionHandler("seekto", function (details) {
+      var setHandler = function (action, handler) {
+        try {
+          navigator.mediaSession.setActionHandler(action, handler)
+        } catch (e) {}
+      }
+
+      setHandler("play", function () { self.play() })
+      setHandler("pause", function () { self.pause() })
+      setHandler("previoustrack", function () { self.prev() })
+      setHandler("nexttrack", function () { self.next() })
+      setHandler("seekbackward", function (details) {
+        self.skipBy(-(details && details.seekOffset ? details.seekOffset : 15))
+      })
+      setHandler("seekforward", function (details) {
+        self.skipBy(details && details.seekOffset ? details.seekOffset : 15)
+      })
+      setHandler("seekto", function (details) {
         if (details.seekTime == null) return
         self.audio.currentTime = details.seekTime
+        self.syncProgress()
       })
+
+      AdvancedPlayer.syncBadge()
     },
 
     playQueue: function (tracks, startIndex) {
@@ -621,6 +737,7 @@
       els.title.textContent = track.title
       els.artist.textContent = track.artist
       els.art.src = track.art
+      this.syncMini(track)
       audio.src = track.src
       audio.load()
       audio.playbackRate = this.speed
@@ -633,7 +750,10 @@
       this.setupMediaSession(track)
       this.renderPageLists()
 
-      if (options.autoplay) this.play()
+      if (options.autoplay) {
+        this.play()
+        AdvancedPlayer.open()
+      }
     },
 
     play: function () {
@@ -729,9 +849,18 @@
         '<section class="catalog" data-page="catalog">' +
           '<header class="catalog__header">' +
             '<p class="catalog__brand">Music App</p>' +
-            "<h1>Library</h1>" +
-            '<p class="catalog__hint">Music play karke bahar jao to ○ <b>Home</b> use karo. Android <b>Back</b> app band karta hai — tab music rukti hai.</p>' +
+            "<h1>Advanced Audio Player</h1>" +
           "</header>" +
+          '<div class="req-card" aria-label="Requirements covered">' +
+            "<h2>What this build demonstrates</h2>" +
+            "<ul>" +
+              "<li>Advanced Audio Player interface (now playing, seek, ±15s, speed, queue)</li>" +
+              "<li>Playback driven by JS <code>MediaSession</code> (metadata + system controls)</li>" +
+              "<li>Background play while app is minimized / screen locked</li>" +
+              "<li>Albums &amp; playlists → play collection</li>" +
+            "</ul>" +
+            '<button type="button" class="btn-primary" id="open-aap-demo">Open Advanced Audio Player</button>' +
+          "</div>" +
           '<div class="catalog__block"><h2>Albums</h2><div class="catalog__grid" id="albums-grid"></div></div>' +
           '<div class="catalog__block"><h2>Playlists</h2><div class="catalog__grid" id="playlists-grid"></div></div>' +
         "</section>"
@@ -915,6 +1044,7 @@
 
     SoftNav.init()
     AudioPlayer.init()
+    AdvancedPlayer.init()
     AndroidBackGuard.init()
     setupInstallPrompt()
     registerServiceWorker()
@@ -956,6 +1086,29 @@
 
   scheduleBoot()
 
+  // Keep Media Session "playing" when the page is hidden (Home / app switch).
+  // Do NOT call audio.pause() on visibilitychange — that would stop background play.
+  document.addEventListener("visibilitychange", function () {
+    if (!AudioPlayer.ready || !AudioPlayer.audio) return
+
+    if (document.hidden) {
+      if (!AudioPlayer.audio.paused && "mediaSession" in navigator) {
+        navigator.mediaSession.playbackState = "playing"
+      }
+      if (AudioPlayer.saveState) AudioPlayer.saveState()
+      return
+    }
+
+    // Returned to foreground: if we intended to play but browser suspended us, resume.
+    try {
+      var raw = sessionStorage.getItem(AudioPlayer.storageKey)
+      var data = raw ? JSON.parse(raw) : null
+      if (data && data.playing && AudioPlayer.audio.paused) {
+        AudioPlayer.play()
+      }
+    } catch (e) {}
+  })
+
   // bfcache restore (browser back from other sites / minimized tab restore)
   window.addEventListener("pageshow", function (event) {
     if (!AudioPlayer.ready) return
@@ -978,4 +1131,5 @@
   window.AudioPlayer = AudioPlayer
   window.SoftNav = SoftNav
   window.AndroidBackGuard = AndroidBackGuard
+  window.AdvancedPlayer = AdvancedPlayer
 })(window, document)

@@ -1,35 +1,40 @@
-<%# Permanent shell — never inside #page-content. Rails 4 port: keep this in layout + data-turbolinks-permanent. %>
-<div id="global-player" class="global-player" aria-label="Now playing">
-  <audio id="audio" preload="auto" playsinline></audio>
+<%# Single persistent audio + Advanced Audio Player (client demo). %>
+<audio id="audio" preload="auto" playsinline></audio>
 
-  <div class="global-player__art-wrap">
-    <img id="track-art" class="global-player__art" src="/cover.svg" alt="" width="56" height="56">
+<%# Full Advanced Audio Player — MediaSession-powered %>
+<div id="advanced-player" class="aap" hidden>
+  <header class="aap__top">
+    <button type="button" class="aap__icon-btn" id="aap-close" aria-label="Close player">↓</button>
+    <div class="aap__top-meta">
+      <p class="aap__eyebrow">Advanced Audio Player</p>
+      <p class="aap__badge" id="mediasession-badge">Media Session · Background ready</p>
+    </div>
+    <button type="button" class="player__install" id="install-app" hidden>Install</button>
+  </header>
+
+  <div class="aap__art-wrap">
+    <img id="track-art" class="aap__art" src="/cover.svg" alt="" width="512" height="512">
   </div>
 
-  <div class="global-player__meta">
-    <p class="global-player__title" id="track-title">Nothing playing</p>
-    <p class="global-player__artist" id="track-artist">Choose a track</p>
+  <div class="aap__meta">
+    <h1 class="aap__title" id="track-title">Nothing playing</h1>
+    <p class="aap__artist" id="track-artist">Choose a track from Library</p>
   </div>
 
-  <div class="global-player__progress">
-    <input
-      class="player__seek"
-      id="seek"
-      type="range"
-      min="0"
-      max="1000"
-      value="0"
-      step="1"
-      aria-label="Seek">
+  <div class="aap__progress">
+    <input class="player__seek" id="seek" type="range" min="0" max="1000" value="0" step="1" aria-label="Seek">
     <div class="player__times">
       <span id="current-time">0:00</span>
       <span id="duration">0:00</span>
     </div>
   </div>
 
-  <div class="global-player__controls" role="group" aria-label="Playback controls">
+  <div class="aap__controls" role="group" aria-label="Playback controls">
     <button type="button" class="ctrl ctrl--ghost" id="btn-shuffle" aria-label="Shuffle" aria-pressed="false">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 3h5v5M4 20l6-6M21 3l-8 8M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
+    </button>
+    <button type="button" class="ctrl" id="btn-seek-back" aria-label="Back 15 seconds">
+      <span class="ctrl__chip">−15</span>
     </button>
     <button type="button" class="ctrl" id="btn-prev" aria-label="Previous">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 20 9 12l10-8v16zM5 19V5"/></svg>
@@ -41,13 +46,16 @@
     <button type="button" class="ctrl" id="btn-next" aria-label="Next">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4l10 8-10 8V4zM19 5v14"/></svg>
     </button>
+    <button type="button" class="ctrl" id="btn-seek-fwd" aria-label="Forward 15 seconds">
+      <span class="ctrl__chip">+15</span>
+    </button>
     <button type="button" class="ctrl ctrl--ghost" id="btn-repeat" aria-label="Repeat" aria-pressed="false" data-mode="off">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 2l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 22l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3"/></svg>
       <span class="repeat-badge" hidden>1</span>
     </button>
   </div>
 
-  <div class="global-player__extras">
+  <div class="aap__extras">
     <div class="player__volume">
       <button type="button" class="ctrl ctrl--tiny" id="btn-mute" aria-label="Mute" aria-pressed="false">
         <svg class="icon-vol" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5zm7.07 1.93a7 7 0 0 1 0 10.14M15.54 8.46a4 4 0 0 1 0 7.07"/></svg>
@@ -57,14 +65,29 @@
     </div>
 
     <div class="player__speed" role="group" aria-label="Playback speed">
+      <span class="player__speed-label">Speed</span>
       <div class="player__speed-options" id="speed-options">
         <button type="button" class="speed-btn" data-speed="0.5" aria-pressed="false">0.5x</button>
         <button type="button" class="speed-btn is-active" data-speed="1" aria-pressed="true">1x</button>
+        <button type="button" class="speed-btn" data-speed="1.25" aria-pressed="false">1.25x</button>
         <button type="button" class="speed-btn" data-speed="1.5" aria-pressed="false">1.5x</button>
         <button type="button" class="speed-btn" data-speed="2" aria-pressed="false">2x</button>
       </div>
     </div>
-
-    <button type="button" class="player__install" id="install-app" hidden>Install</button>
   </div>
+
+  <p class="aap__footnote">
+    Playback uses the JavaScript <strong>Media Session API</strong> for lock-screen / notification controls
+    and background audio while the app stays in memory (Home / minimize). Cordova can layer OS services in wrapped apps.
+  </p>
 </div>
+
+<%# Compact bar — opens Advanced Audio Player %>
+<button type="button" id="global-player" class="global-player" aria-label="Open Advanced Audio Player">
+  <img id="mini-art" class="global-player__art" src="/cover.svg" alt="" width="48" height="48">
+  <span class="global-player__meta">
+    <span class="global-player__title" id="mini-title">Nothing playing</span>
+    <span class="global-player__artist" id="mini-artist">Tap to open Advanced Audio Player</span>
+  </span>
+  <span class="global-player__open">Open</span>
+</button>

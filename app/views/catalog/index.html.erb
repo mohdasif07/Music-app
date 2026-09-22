@@ -1,11 +1,21 @@
-<% content_for :title, "Music App — Library" %>
+<% content_for :title, "Advanced Audio Player Demo" %>
 
 <section class="catalog" data-page="catalog">
   <header class="catalog__header">
     <p class="catalog__brand">Music App</p>
-    <h1>Library</h1>
-    <p class="catalog__hint">Play ke baad bahar jane ke liye ○ <b>Home</b> dabao. Android <b>&lt; Back</b> app band karta hai isliye music rukti hai — Home pe music chalti rahegi.</p>
+    <h1>Advanced Audio Player</h1>
   </header>
+
+  <div class="req-card" aria-label="Requirements covered">
+    <h2>What this build demonstrates</h2>
+    <ul>
+      <li>Advanced Audio Player interface (now playing, seek, ±15s, speed, queue)</li>
+      <li>Playback driven by JS <code>MediaSession</code> (metadata + system controls)</li>
+      <li>Background play while app is minimized / screen locked</li>
+      <li>Albums &amp; playlists → play collection</li>
+    </ul>
+    <button type="button" class="btn-primary" id="open-aap-demo">Open Advanced Audio Player</button>
+  </div>
 
   <div class="catalog__block">
     <h2>Albums</h2>
